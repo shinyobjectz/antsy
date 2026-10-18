@@ -1,6 +1,6 @@
 {
   "name": "antsy",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Fail fast, never wait on a clock. Failure-mode contracts for every long job, a token-free background watcher, OpenTelemetry on everything, cheapest-first testing and shared memory safety for agents.",
   "author": { "name": "shinyobjectz", "url": "https://github.com/shinyobjectz" },
   "homepage": "https://github.com/shinyobjectz/antsy",

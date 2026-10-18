@@ -60,6 +60,7 @@ pub fn record_job(job: &Value, trace_id: &str, span_id: &str, start: f64, end: f
             "attributes": [
                 kv("process.command_line", json!(s(job, "cmd"))),
                 kv("antsy.mode", json!(s(job, "mode"))),
+                kv("antsy.for", json!(s(job, "for"))),
                 kv("antsy.exit", json!(i(job, "exit"))),
                 kv("antsy.peak_mb", json!(i(job, "peak_mb"))),
                 kv("antsy.lines", json!(i(job, "lines"))),

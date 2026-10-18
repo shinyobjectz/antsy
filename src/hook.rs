@@ -13,6 +13,7 @@ pub const CREED: &str = "Antsy is on (fail fast, never wait on a clock):
 - Leave nothing hanging: every job has a waiter or gets stopped (`antsy stop`) before you finish. `antsy board` shows what every agent on this machine is running.
 - Test cheapest first: offline, mocks, recorded replays and tiny inputs before any paid call; log real spend with `antsy spend <usd> <what>`.
 - Memory is shared: check `antsy board` before heavy local work (builds, models). antsy refuses heavy jobs below the free-memory floor instead of letting the machine swap.
+- Attribute and account: say what each run or dollar is for (`--for '<question or goal>'`, or export ANTSY_FOR), note what it bought (`antsy note`), and let `antsy account` show whether time and money are going where they should. For ML, evals, tests and automations, know your data: where it came from, its slices, and which results each slice explains.
 Skill: antsy (philosophy and recipes).";
 
 fn input() -> Value {
@@ -57,7 +58,7 @@ pub fn main(args: &[String]) -> i32 {
         x => x.to_string(),
     };
     match ev {
-        "session-start" => session_start(&sess),
+        "session-start" => session_start(&sess, s(&inp, "cwd")),
         "pre-bash" => pre_bash(&sess, s(&inp["tool_input"], "command")),
         "post-tool" => deliver(&sess, "PostToolUse"),
         "prompt" => deliver(&sess, "UserPromptSubmit"),
@@ -67,14 +68,29 @@ pub fn main(args: &[String]) -> i32 {
     0
 }
 
-fn session_start(sess: &str) {
+fn session_start(sess: &str, cwd: &str) {
     crate::daemon::ensure();
     feed::start_cursor(sess);
     let mut text = CREED.to_string();
+    let cwd = if cwd.is_empty() { std::env::current_dir().unwrap_or_default() } else { cwd.into() };
+    let home = std::path::PathBuf::from(std::env::var("HOME").unwrap_or_default());
+    if let Some(root) = crate::init::root(&cwd).filter(|r| *r != home) {
+        if !crate::init::configured(&cwd) {
+            text.push_str(&format!(
+                "\n\nThis project ({}) has no .antsy.json yet. Before its first long-running work, set it up: \
+                 follow the antsy skill's references/setup.md (start with `antsy init`). A `{{}}` .antsy.json opts out.",
+                root.display()
+            ));
+        }
+    }
     let (jobs, ws) = feed::mine_running(sess);
     if !jobs.is_empty() || !ws.is_empty() {
         text.push_str("\n\nStill running for this session:\n");
         text.push_str(&board::render(true));
+    }
+    if let Some(line) = crate::account::summary_line() {
+        text.push_str("\n\n");
+        text.push_str(&line);
     }
     let others = board::running_jobs().len() - jobs.len();
     if others > 0 {
@@ -133,8 +149,8 @@ fn pre_bash(sess: &str, cmd: &str) {
         if nudge_ok(&c, sess, "heavy") {
             context(
                 "PreToolUse",
-                "antsy: heavy command. Prefer `antsy run --name <n> [--mem <cap>] -- <cmd>` (stall/memory/fail-fast, trace, \
-                 event to this session) with run_in_background; it also sizes CARGO_BUILD_JOBS to free memory."
+                "antsy: heavy command. Prefer `antsy run --name <n> --for \"<what it's for>\" [--mem <cap>] -- <cmd>` (stall/memory/fail-fast, \
+                 trace, attribution, event to this session) with run_in_background; it also sizes CARGO_BUILD_JOBS to free memory."
                     .into(),
             );
         }
@@ -155,7 +171,7 @@ fn pre_bash(sess: &str, cmd: &str) {
                 "PreToolUse",
                 format!(
                     "antsy: this looks like a paid call ({}). Cheapest rung first: is there a mock, a recorded response, a smaller model, \
-                     a 1-item input, or a dry-run flag? Cache what you get. Log real spend: `antsy spend <usd> <what>` (today ${spent:.2} of ${cap:.2}).",
+                     a 1-item input, or a dry-run flag? Cache what you get. Log real spend with its purpose: `antsy spend <usd> <what> --for \"<goal>\"` (today ${spent:.2} of ${cap:.2}).",
                     s(p, "note")
                 ),
             );

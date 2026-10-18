@@ -17,6 +17,11 @@ makes a coding agent impatient with failure:
   from any instrumented program become failure events for the session that owns them.
 - **Cheapest-first testing.** A cost ladder in the skill, a spend ledger with a daily cap that fails
   fast, and reminders on paid-API commands.
+- **Attribution and allocation.** Runs and spend carry a purpose (`--for`), outcomes get noted, and
+  `antsy account` shows where compute and money went, how much is unattributed, failure loops, and big
+  purposes with nothing to show. For ML, evals and tests, the skill also asks for a map of the data
+  (sources, slices, labels, splits) and for each result to be attributed to the slice or change that
+  explains it. None of this is enforced; it keeps the questions in view.
 - **Shared memory safety.** An admission check refuses heavy work below a free-memory floor instead of
   letting the machine swap. `antsy board` shows every agent's jobs with measured memory, and
   `CARGO_BUILD_JOBS` is sized to free memory. Antsy defers to an existing memory killer such as
@@ -33,7 +38,9 @@ sh ~/.claude/plugins/marketplaces/antsy/scripts/install.sh   # binary: release d
 Or build it yourself: `cargo install --git https://github.com/shinyobjectz/antsy --locked`. The plugin's
 `bin/antsy` shim finds the binary in `~/.antsy/bin`, `~/.cargo/bin`, or the plugin's `target/release`.
 
-Check the install with `antsy doctor`.
+Check the install with `antsy doctor`. Nothing needs initializing. On an existing project the
+session-start context points the agent at `antsy init`, which scans the project and drafts a
+`.antsy.json`, and then at the setup decision tree in `skills/antsy/references/setup.md`.
 
 ## What the agent sees
 
@@ -64,7 +71,9 @@ antsy events -f       # stream results and failures (what the plugin monitor run
 antsy board           # memory, every agent's jobs and watches, today's spend
 antsy log ID          # outcome and log tail
 antsy stop ID         # or --mine
-antsy spend 0.42 "3 judge calls"
+antsy spend 0.42 "3 judge calls" --for "eval: judge prompt v4"
+antsy note ID "flake was a stale fixture" --useful
+antsy account         # by purpose: runs, fail %, compute, peak, spend, useful/waste
 ```
 
 Exit codes from `antsy run` are the child's own code, or one of these:
@@ -100,7 +109,8 @@ Defaults are built into the binary. `~/.antsy/config.json` overrides them per us
 ```
 
 See [`skills/antsy/SKILL.md`](skills/antsy/SKILL.md) for the full philosophy, and `skills/antsy/references/`
-for failure-mode recipes, telemetry, the cost ladder, and memory and build guidance.
+for project setup, failure-mode recipes, telemetry, the cost ladder, data and allocation, and memory
+and build guidance.
 
 ## How it works
 
