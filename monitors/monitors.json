@@ -1,0 +1,7 @@
+[
+  {
+    "name": "antsy",
+    "command": "\"${CLAUDE_PLUGIN_ROOT}\"/bin/antsy events --follow",
+    "description": "Antsy: failures and results of this session's jobs and watches, and machine memory warnings. Silent until something happens."
+  }
+]

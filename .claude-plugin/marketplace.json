@@ -1,0 +1,15 @@
+{
+  "name": "antsy",
+  "description": "Antsy: a fail-fast operating philosophy and token-free failure watcher for Claude Code.",
+  "owner": {
+    "name": "shinyobjectz",
+    "url": "https://github.com/shinyobjectz"
+  },
+  "plugins": [
+    {
+      "name": "antsy",
+      "source": ".",
+      "description": "Fail fast, never wait on a clock: failure-mode contracts, a token-free watcher, OTel, cheap tests, memory safety."
+    }
+  ]
+}
