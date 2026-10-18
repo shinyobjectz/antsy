@@ -22,6 +22,7 @@ impl Env {
             .env("ANTSY_NO_DAEMON", "1")
             .env("ANTSY_SESSION", "test")
             .env_remove("CLAUDE_CODE_SESSION_ID")
+            .env_remove("ANTSY_FOR")
             .output()
             .unwrap()
     }
@@ -130,4 +131,39 @@ fn pre_bash_denies_long_sleeps_and_poll_loops() {
     assert!(hook("until curl -s x; do sleep 1; done").contains("deny"));
     assert!(!hook("sleep 1").contains("deny"));
     assert!(!hook("antsy run --max 30s -- sh -c 'until x; do sleep 1; done'").contains("deny"));
+}
+
+#[test]
+fn init_drafts_config_for_a_project() {
+    let e = Env::new("init");
+    let proj = e.home.join("proj");
+    std::fs::create_dir_all(proj.join("crates/a")).unwrap();
+    std::fs::write(proj.join("crates/a/Cargo.toml"), "[package]\nname = \"a\"\n[profile.release]\nlto = \"fat\"\n").unwrap();
+    std::fs::write(proj.join("package.json"), r#"{"dependencies": {"openai": "4"}}"#).unwrap();
+    let run = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_antsy")).args(args).current_dir(&proj).env("ANTSY_HOME", &e.home).output().unwrap()
+    };
+    let out = String::from_utf8(run(&["init"]).stdout).unwrap();
+    assert!(out.contains("Rust in crates/a/"), "{out}");
+    assert!(out.contains("openai"), "{out}");
+    assert!(out.contains("fat LTO"), "{out}");
+    assert_eq!(run(&["init", "--write"]).status.code(), Some(0));
+    assert!(proj.join(".antsy.json").exists());
+    assert_eq!(run(&["init", "--write"]).status.code(), Some(1), "never overwrites");
+}
+
+#[test]
+fn account_attributes_runs_spend_and_loops() {
+    let e = Env::new("account");
+    for _ in 0..3 {
+        e.antsy(&["run", "-q", "--name", "flaky", "--for", "fix login test", "--", "sh -c 'exit 1'"]);
+    }
+    e.antsy(&["run", "-q", "--name", "misc", "--", "true"]);
+    e.antsy(&["spend", "0.25", "judge", "--for", "fix login test"]);
+    assert_eq!(e.antsy(&["note", "fix login test", "the fixture was stale", "--useful"]).status.code(), Some(0));
+    let out = String::from_utf8(e.antsy(&["account"]).stdout).unwrap();
+    assert!(out.contains("fix login test"), "{out}");
+    assert!(out.contains("$0.25"), "{out}");
+    assert!(out.contains("(unattributed)"), "{out}");
+    assert!(out.contains("loop: flaky failed 3×"), "{out}");
 }

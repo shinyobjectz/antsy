@@ -19,6 +19,14 @@ watching. Waiting is an event, not a duration.
 The plugin gives you a binary, `antsy`, and hooks that run on every session. The hooks are cheap
 state-file reads; they speak only when something failed or a rule is about to be broken.
 
+## First time in a project
+
+Nothing needs initializing. When a project has no `.antsy.json`, the session-start context says
+so; before its first long-running work, run `antsy init` and follow `references/setup.md`. It's a
+short decision tree: attach watches to what's already running, tune the failure lines and heavy
+commands, find the free rung for paid calls, check telemetry and build settings, then write the
+config.
+
 ## The rules
 
 1. **Decide how it fails before you start it.** Every job that runs longer than a moment gets a
@@ -71,7 +79,17 @@ state-file reads; they speak only when something failed or a rule is about to be
    machine-wide killer where one exists; antsy defers to memguard, earlyoom, and systemd-oomd. Rust
    builds and local models have their own guidance in `references/memory-and-builds.md`.
 
-7. **When woken, double-check.** A failure event is a lead, not a verdict. Read the log tail
+7. **Attribute and account.** Every run and dollar should say what it is for: `--for "<question or
+   goal>"` on `antsy run` and `antsy spend`, or `export ANTSY_FOR=…` for the session's current
+   purpose. Note what it bought with `antsy note ID|PURPOSE "<finding>" --useful|--waste`. Review
+   `antsy account` (session start shows a one-line summary). It shows where compute and money
+   went, how much is unattributed, which jobs are stuck in failure loops, and which big purposes
+   have no outcome. This is judgment, not enforcement: re-allocate when the numbers and the value
+   don't match. For ML, evals, test suites and automations, map the data first (sources, slices,
+   labels, splits, coverage) and attribute every result to the slice or change that explains it.
+   See `references/data-and-allocation.md`.
+
+8. **When woken, double-check.** A failure event is a lead, not a verdict. Read the log tail
    (`antsy log ID`), confirm with a second signal (exit code, test output, the trace), fix, and
    rerun the narrowest thing that proves the fix.
 
@@ -79,7 +97,7 @@ state-file reads; they speak only when something failed or a rule is about to be
 
 | Command | Use |
 |---|---|
-| `antsy run [flags] -- <cmd>` | Run under a contract. Flags: `--name`, `--stall 2m`, `--max 2h`, `--mem 8G`, `--need-mem 4G`, `--fail-on RE` (repeatable), `--no-default-fail-on`, `--grace 3s`, `--progress-file F`, `--cost-usd 0.40`, `-q`. |
+| `antsy run [flags] -- <cmd>` | Run under a contract. Flags: `--name`, `--stall 2m`, `--max 2h`, `--mem 8G`, `--need-mem 4G`, `--fail-on RE` (repeatable), `--no-default-fail-on`, `--grace 3s`, `--progress-file F`, `--cost-usd 0.40`, `--for PURPOSE`, `-q`. |
 | `antsy watch pid <pid> [--mem 8G] [--stall 5m --progress-file F]` | Watch a process you didn't start. |
 | `antsy watch log <file> [--fail-on RE] [--until RE] [--stall 2m]` | Fail on a log line, finish on another. |
 | `antsy watch check --every 30s [--until-ok] [--until RE] [--fail-on RE] -- <probe>` | Cheap polling done by the daemon (CI status, a health URL, a file appearing). |
@@ -88,6 +106,9 @@ state-file reads; they speak only when something failed or a rule is about to be
 | `antsy board [--mine]` | Memory, every agent's jobs and watches, today's spend. |
 | `antsy log ID` / `antsy stop ID…` / `antsy stop --mine` | Inspect or stop. |
 | `antsy spend [USD WHAT]` | Spend ledger with a daily cap (exit 3 over it). |
+| `antsy note ID\|PURPOSE TEXT [--useful\|--waste]` | Record what a run or purpose bought. |
+| `antsy account [--days 7] [--by for\|name\|mode\|session]` | Where compute and money went; failure loops; purposes with no outcome. |
+| `antsy init [--write]` | Scan the project and draft its `.antsy.json` (see `references/setup.md`). |
 
 Exit codes from `antsy run`: the child's own code, or 121 stall, 122 memory cap, 123 fail_on line,
 124 max ceiling, 125 refused at admission (memory or budget), 126 stopped on request, 128+N signal.

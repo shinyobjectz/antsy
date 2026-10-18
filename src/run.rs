@@ -39,6 +39,8 @@ pub struct Opts {
     pub quiet: bool,
     pub progress_file: Option<String>,
     pub cost_usd: f64,
+    /// What this run is for: the question it answers or the goal it serves (attribution).
+    pub purpose: String,
     pub cmd: Vec<String>,
 }
 
@@ -56,6 +58,7 @@ pub fn parse(args: &[String]) -> Result<Opts, String> {
         quiet: false,
         progress_file: None,
         cost_usd: 0.0,
+        purpose: std::env::var("ANTSY_FOR").unwrap_or_default(),
         cmd: vec![],
     };
     let mut it = args.iter();
@@ -76,6 +79,7 @@ pub fn parse(args: &[String]) -> Result<Opts, String> {
             "--grace" => o.grace = parse_dur(&val()?),
             "--progress-file" => o.progress_file = Some(val()?),
             "--cost-usd" => o.cost_usd = val()?.parse().map_err(|_| "--cost-usd takes dollars")?,
+            "--for" | "--purpose" => o.purpose = val()?,
             "--quiet" | "-q" => o.quiet = true,
             _ if a.starts_with('-') => return Err(format!("unknown flag {a}")),
             _ => {
@@ -169,6 +173,9 @@ pub fn main(args: &[String]) -> i32 {
     cmd.process_group(0).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
     cmd.env("TRACEPARENT", format!("00-{trace_id}-{span_id}-01"));
     cmd.env("ANTSY_JOB", &id);
+    if !o.purpose.is_empty() {
+        cmd.env("ANTSY_FOR", &o.purpose);
+    }
     cmd.env("ANTSY_SESSION", &sess);
     let mut attrs = format!("antsy.job={id},antsy.session={sess}");
     if let Ok(prev) = std::env::var("OTEL_RESOURCE_ATTRIBUTES") {
@@ -209,6 +216,7 @@ pub fn main(args: &[String]) -> i32 {
         "pid": std::process::id(), "pgid": pgid, "started": start, "status": "running",
         "stall": o.stall, "max": o.max, "mem_mb": o.mem_mb, "log": log_path.display().to_string(),
         "last_output": start, "lines": 0, "rss_mb": 0, "peak_mb": 0, "trace_id": trace_id,
+        "for": o.purpose, "cost_usd": o.cost_usd,
     });
     write_json(&job_path, &job);
     emit("start", &sess, &id, "", &o.name);
@@ -363,7 +371,8 @@ pub fn main(args: &[String]) -> i32 {
     write_json(&job_path, &job);
     append_line(
         &home().join("history.jsonl"),
-        &json!({"name": o.name, "cmd": cmdline, "status": status, "mode": mode, "secs": dur, "peak_mb": peak, "ts": now()}),
+        &json!({"id": id, "name": o.name, "for": o.purpose, "cmd": cmdline, "status": status, "mode": mode,
+                "secs": dur, "peak_mb": peak, "cost_usd": o.cost_usd, "session": sess, "ts": now()}),
     );
     otel::record_job(&job, &trace_id, &span_id, start, now());
 
