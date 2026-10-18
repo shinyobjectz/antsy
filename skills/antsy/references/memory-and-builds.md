@@ -37,8 +37,8 @@ already set. Beyond that:
   builds into the same target dir serialize on cargo's lock; treat that wait as an event, not as
   a hang.
 - **sccache** helps repeated cold builds when there's disk to spare for its cache.
-- Record peaks: `~/.antsy/history.jsonl` has `peak_mb` for every named job; use it for the next
-  `--mem`.
+- Record peaks: every named job's `peak_mb` is kept. `antsy history NAME` shows them, and
+  `--mem auto` caps the next run at 30% over the highest recent peak.
 
 Other compiled languages follow the same rules: `swift build -j`, `make -j` from free memory,
 `xcodebuild -jobs`, Gradle `--max-workers`, `go build -p`.

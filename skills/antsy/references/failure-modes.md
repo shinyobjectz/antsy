@@ -8,7 +8,7 @@ job and seeing what happens.
 |---|---|---|
 | What does progress look like? | `--stall`, `--progress-file` | Output lines by default. For silent jobs (linkers, renders, downloads), point `--progress-file` at a file that grows or is touched as work advances. Pick a silence that would mean "hung", not "slow". |
 | Which lines mean it already failed? | `--fail-on RE`, `.antsy.json` `fail_on` | The first error usually decides the run. Defaults cover compiler errors, panics, tracebacks, OOM, `npm ERR!`, and `** BUILD FAILED **`. Add the project's own: `FAILED`, `AssertionError`, `level=error`, `HTTP 5..`. |
-| How much memory may it hold? | `--mem` (cap), `--need-mem` (admission) | Use the measured peak from earlier runs (`antsy log ID` and `~/.antsy/history.jsonl` hold `peak_mb`) plus headroom. With no history, start small and let the cap tell you. |
+| How much memory may it hold? | `--mem` (cap), `--need-mem` (admission) | `--mem auto` uses the measured peaks of earlier runs with the same `--name` (`antsy history NAME`). With no history, start small and let the cap tell you. |
 | What may it cost? | `--cost-usd`, `antsy spend` | See cost.md. A paid job without a cost line is a contract with a hole in it. |
 | When is it pointless to continue? | `--max` | A generous ceiling for things that are alive but never finish (an infinite retry loop that prints). It isn't an estimate, and nothing gets planned around it. |
 

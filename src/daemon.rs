@@ -3,7 +3,7 @@
 
 use crate::config::{self, get_f, get_str, strs};
 use crate::util::*;
-use crate::{mem, otel, watch};
+use crate::{mem, otel, pb, watch};
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -245,13 +245,24 @@ fn serve(mut stream: TcpStream) -> std::io::Result<()> {
             return Ok(());
         }
     };
-    // Protobuf or compressed batches are accepted (so exporters don't retry) but can't be read.
-    if !ctype.contains("json") || !(encoding.is_empty() || encoding == "identity") {
-        otel::store(kind, &json!({"unreadable": format!("{ctype} {encoding}"), "bytes": len}));
-        reply("200 OK", "{}");
-        return Ok(());
-    }
-    let v: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
+    let body = if encoding == "gzip" {
+        match pb::gunzip(&body) {
+            Some(b) => b,
+            None => {
+                reply("400 Bad Request", "{}");
+                return Ok(());
+            }
+        }
+    } else {
+        body
+    };
+    let v: Value = if ctype.contains("json") {
+        serde_json::from_slice(&body).unwrap_or(Value::Null)
+    } else if ctype.contains("protobuf") {
+        pb::decode(kind, &body).unwrap_or_else(|| json!({"undecoded": kind, "bytes": body.len()}))
+    } else {
+        json!({"unreadable": ctype, "bytes": body.len()})
+    };
     otel::store(kind, &v);
     let failures = match kind {
         "traces" => otel::span_failures(&v),

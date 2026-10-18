@@ -1,6 +1,6 @@
 [package]
 name = "antsy"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "Fail-fast supervisor, failure-mode watcher and OTLP sink for coding agents"
@@ -10,9 +10,10 @@ keywords = ["claude-code", "supervisor", "opentelemetry", "agents", "fail-fast"]
 categories = ["command-line-utilities", "development-tools"]
 rust-version = "1.80"
 
-# Three small dependencies keep a cold build short and light on memory.
+# Four small, pure-Rust dependencies keep a cold build short and light on memory.
 [dependencies]
 libc = "0.2"
+miniz_oxide = { version = "0.8", default-features = false, features = ["with-alloc"] }
 regex-lite = "0.1"
 serde_json = "1"
 

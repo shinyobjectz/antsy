@@ -63,6 +63,7 @@ pub fn main(args: &[String]) -> i32 {
         "post-tool" => deliver(&sess, "PostToolUse"),
         "prompt" => deliver(&sess, "UserPromptSubmit"),
         "stop" => stop(&sess, inp["stop_hook_active"].as_bool().unwrap_or(false)),
+        "session-end" => session_end(&sess),
         _ => {}
     }
     0
@@ -210,4 +211,21 @@ fn stop(sess: &str, already: bool) {
 
 fn block(reason: String) {
     println!("{}", json!({"decision": "block", "reason": reason}));
+}
+
+/// Nobody will hear this session's watches or detached jobs after it ends, so they end with it
+/// (config `on_session_end`: "stop", the default, or "keep").
+fn session_end(sess: &str) {
+    if get_str(&config::load(), "on_session_end") == "keep" {
+        return;
+    }
+    let (jobs, ws) = feed::mine_running(sess);
+    for w in ws {
+        let _ = std::fs::remove_file(dir("watches").join(format!("{}.json", s(&w, "id"))));
+        emit("done", sess, s(&w, "id"), "session_end", &format!("{}: watch removed when its session ended", s(&w, "name")));
+    }
+    for j in jobs.iter().filter(|j| ppid_of(i(j, "pid")) <= 1) {
+        let _ = std::fs::write(dir("jobs").join(format!("{}.stop", s(j, "id"))), "its session ended");
+    }
+    let _ = std::fs::remove_file(dir("cursors").join(format!("{}.json", sess.replace('/', "_"))));
 }
