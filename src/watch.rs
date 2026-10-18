@@ -9,7 +9,7 @@ use std::io::{Read, Seek, SeekFrom};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-const USAGE: &str = "usage:
+const USAGE: &str = "usage (every form also takes --for PURPOSE):
   antsy watch pid <pid> [--name N] [--mem 8G] [--stall 5m --progress-file F]
   antsy watch log <file> [--name N] [--fail-on RE]... [--until RE] [--stall 2m]
   antsy watch check [--name N] [--every 30s] [--until-ok] [--until RE] [--fail-on RE] -- <command>";
@@ -25,6 +25,7 @@ pub fn main(args: &[String]) -> i32 {
         "stall": 0.0, "max": parse_dur(&get_str(&c, "max")), "every": 30.0, "mem_mb": 0,
         "fail_on": [], "until": [], "until_ok": false, "progress_file": "",
         "last_progress": now(), "last_run": 0.0, "offset": 0, "target": "",
+        "for": std::env::var("ANTSY_FOR").unwrap_or_default(),
     });
     let mut it = args[1..].iter();
     while let Some(a) = it.next() {
@@ -43,6 +44,7 @@ pub fn main(args: &[String]) -> i32 {
             "--until" => w["until"].as_array_mut().unwrap().push(json!(val())),
             "--until-ok" => w["until_ok"] = json!(true),
             "--progress-file" => w["progress_file"] = json!(val()),
+            "--for" | "--purpose" => w["for"] = json!(val()),
             _ if a.starts_with('-') => {
                 eprintln!("unknown flag {a}\n{USAGE}");
                 return 2;
