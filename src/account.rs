@@ -211,3 +211,49 @@ pub fn main(args: &[String]) -> i32 {
     }
     0
 }
+
+/// Measured peaks of a job name's recent successful runs, newest last.
+pub fn peaks(name: &str, n: usize) -> Vec<u64> {
+    let all: Vec<u64> = rows("history.jsonl", 0.0)
+        .iter()
+        .filter(|h| s(h, "name") == name && s(h, "status") == "ok")
+        .map(|h| i(h, "peak_mb") as u64)
+        .collect();
+    all[all.len().saturating_sub(n)..].to_vec()
+}
+
+/// `antsy history [NAME] [-n 15]`: what past runs measured. Data for the next contract, not a forecast.
+pub fn history(args: &[String]) -> i32 {
+    let n: usize = args.iter().position(|a| a == "-n").and_then(|p| args.get(p + 1)).and_then(|x| x.parse().ok()).unwrap_or(15);
+    let name = args.iter().enumerate().find(|(k, a)| !a.starts_with('-') && (*k == 0 || args[k - 1] != "-n")).map(|(_, a)| a.as_str());
+    let all = rows("history.jsonl", 0.0);
+    let hits: Vec<&Value> = all.iter().filter(|h| name.map(|x| s(h, "name") == x).unwrap_or(true)).collect();
+    if hits.is_empty() {
+        println!("no runs recorded{}", name.map(|x| format!(" for {x}")).unwrap_or_default());
+        return 0;
+    }
+    for h in &hits[hits.len().saturating_sub(n)..] {
+        let outcome = if s(h, "status") == "ok" { "ok".to_string() } else { format!("FAILED {}", s(h, "mode")) };
+        println!(
+            "{:>7} ago  {:<28} {:<16} ran {:>7}  peak {:>8}{}",
+            fmt_ago(now() - f(h, "ts")),
+            s(h, "name").chars().take(28).collect::<String>(),
+            outcome,
+            fmt_ago(f(h, "secs")),
+            fmt_mb(i(h, "peak_mb") as u64),
+            if s(h, "for").is_empty() { String::new() } else { format!("  for: {}", s(h, "for")) }
+        );
+    }
+    if let Some(x) = name {
+        let p = peaks(x, 5);
+        if let Some(max) = p.iter().max() {
+            println!("highest peak of the last {} ok run(s): {}; `--mem auto` would cap at {}", p.len(), fmt_mb(*max), fmt_mb(auto_cap(*max)));
+        }
+    }
+    0
+}
+
+/// The cap `--mem auto` uses: 30% over the highest recent peak, at least 256 MB.
+pub fn auto_cap(peak: u64) -> u64 {
+    (peak + peak * 3 / 10).max(256)
+}

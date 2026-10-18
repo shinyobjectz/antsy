@@ -1,5 +1,8 @@
 # Antsy
 
+[![ci](https://github.com/shinyobjectz/antsy/actions/workflows/ci.yml/badge.svg)](https://github.com/shinyobjectz/antsy/actions/workflows/ci.yml)
+[![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 **Fail fast. Never wait on a clock.** Antsy is a Claude Code plugin, skill, and small Rust binary that
 makes a coding agent impatient with failure:
 
@@ -35,6 +38,9 @@ claude plugin install antsy@antsy
 sh ~/.claude/plugins/marketplaces/antsy/scripts/install.sh   # binary: release download, else cargo build
 ```
 
+Release binaries for macOS (arm64, x86_64) and Linux (x86_64, arm64, static musl) are on the
+[releases page](https://github.com/shinyobjectz/antsy/releases); the install script picks the right one.
+
 Or build it yourself: `cargo install --git https://github.com/shinyobjectz/antsy --locked`. The plugin's
 `bin/antsy` shim finds the binary in `~/.antsy/bin`, `~/.cargo/bin`, or the plugin's `target/release`.
 
@@ -52,6 +58,7 @@ stay silent unless one of these happens:
 | PreToolUse (Bash) | a `sleep` over 5 s or an unbounded poll loop (denied); heavy work below the memory floor (denied); first heavy or paid command of the session (a one-line nudge); spend cap reached (denied) |
 | PostToolUse, UserPromptSubmit | a failure or result arrived for this session since the last check |
 | Stop | unread failures, or detached jobs and watches with nobody listening (blocks once) |
+| SessionEnd | stops the session's watches and detached jobs, since nobody is left to hear them |
 | Monitor `antsy` | streams this session's failures and results as they happen, even while idle |
 
 ## Usage
@@ -70,6 +77,8 @@ antsy wait            # block until this session's next result; exit 1 on a fail
 antsy events -f       # stream results and failures (what the plugin monitor runs)
 antsy board           # memory, every agent's jobs and watches, today's spend
 antsy log ID          # outcome and log tail
+antsy traces --errors # spans received over OTLP (JSON or protobuf, plain or gzip) and job spans
+antsy history build   # measured outcomes, durations, peaks; `--mem auto` caps from them
 antsy stop ID         # or --mine
 antsy spend 0.42 "3 judge calls" --for "eval: judge prompt v4"
 antsy note ID "flake was a stale fixture" --useful
@@ -125,7 +134,7 @@ and build guidance.
 
 All state lives in plain files under `~/.antsy`: jobs, logs, events, traces, the spend ledger and run
 history. The daemon starts on demand, runs once per user, and exits when idle. It is a single
-dependency-light binary built from three crates (`libc`, `regex-lite`, `serde_json`).
+dependency-light binary built from four pure-Rust crates (`libc`, `miniz_oxide`, `regex-lite`, `serde_json`).
 
 Supported platforms are macOS and Linux.
 

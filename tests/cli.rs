@@ -167,3 +167,50 @@ fn account_attributes_runs_spend_and_loops() {
     assert!(out.contains("(unattributed)"), "{out}");
     assert!(out.contains("loop: flaky failed 3×"), "{out}");
 }
+
+#[test]
+fn mem_auto_learns_from_history() {
+    let e = Env::new("memauto");
+    let alloc = "python3 -c 'x=bytearray(120*1024*1024); print(len(x))'";
+    assert_eq!(e.antsy(&["run", "-q", "--name", "alloc", "--", alloc]).status.code(), Some(0));
+    let o = e.antsy(&["run", "--name", "alloc", "--mem", "auto", "--", alloc]);
+    let err = String::from_utf8(o.stderr).unwrap();
+    assert_eq!(o.status.code(), Some(0), "{err}");
+    assert!(err.contains("mem cap"), "{err}");
+    let hist = String::from_utf8(e.antsy(&["history", "alloc"]).stdout).unwrap();
+    assert!(hist.contains("--mem auto"), "{hist}");
+}
+
+#[test]
+fn session_end_removes_watches() {
+    let e = Env::new("sessend");
+    let log = e.home.join("x.log");
+    std::fs::write(&log, "").unwrap();
+    assert_eq!(e.antsy(&["watch", "log", log.to_str().unwrap()]).status.code(), Some(0));
+    let mut c = Command::new(env!("CARGO_BIN_EXE_antsy"))
+        .args(["hook", "session-end"])
+        .env("ANTSY_HOME", &e.home)
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    use std::io::Write;
+    c.stdin.take().unwrap().write_all(br#"{"session_id":"test"}"#).unwrap();
+    c.wait().unwrap();
+    assert_eq!(std::fs::read_dir(e.home.join("watches")).unwrap().count(), 0);
+}
+
+#[test]
+fn check_patterns_match_per_line() {
+    let e = Env::new("checkline");
+    let o = e.antsy(&["watch", "check", "--name", "ci", "--every", "2s", "--until", "^success$", "--", "printf 'queued\\nsuccess\\n'"]);
+    assert_eq!(o.status.code(), Some(0));
+    // Run the daemon's evaluation directly through a short-lived daemon.
+    let mut d = Command::new(env!("CARGO_BIN_EXE_antsy")).arg("daemon").env("ANTSY_HOME", &e.home).spawn().unwrap();
+    let t = Instant::now();
+    while !e.events().contains("\"kind\":\"done\"") && t.elapsed().as_secs() < 10 {
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+    let _ = d.kill();
+    let _ = d.wait();
+    assert!(e.events().contains("ci: success"), "{}", e.events());
+}

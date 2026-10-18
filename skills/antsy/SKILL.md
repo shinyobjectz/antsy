@@ -56,14 +56,16 @@ config.
    Before you end a turn, every job is either finished, stopped (`antsy stop ID`), or has a
    waiter. The Stop hook blocks once when a detached job or watch has nobody listening, and when
    failures arrived that you haven't looked at. `antsy run` kills the job's whole process group
-   when it ends, so nothing it started outlives it.
+   when it ends, so nothing it started outlives it. When a session ends, its watches and detached
+   jobs are stopped, since nobody is left to hear about them (`on_session_end: "keep"` to opt out).
 
 4. **Trace everything.** Programs run under `antsy run` get `TRACEPARENT`, `ANTSY_JOB`, and an
    OTLP/JSON endpoint pointing at the antsy daemon (127.0.0.1:4318) unless one is already set.
    When you write or touch code that does I/O, a network call, a queue, or a long computation,
    instrument it: spans around units of work, error status on failure, structured error logs.
    Error spans and ERROR logs become failure events for the session that owns them, without
-   anyone reading the trace. See `references/telemetry.md`.
+   anyone reading the trace. Read them back with `antsy traces --job ID` or `--errors`. See
+   `references/telemetry.md`.
 
 5. **Test cheapest first.** Before a call that costs money, climb the cost ladder: static checks,
    unit tests with fakes, recorded replays, a local or smaller model, one tiny real call, then the
@@ -97,7 +99,7 @@ config.
 
 | Command | Use |
 |---|---|
-| `antsy run [flags] -- <cmd>` | Run under a contract. Flags: `--name`, `--stall 2m`, `--max 2h`, `--mem 8G`, `--need-mem 4G`, `--fail-on RE` (repeatable), `--no-default-fail-on`, `--grace 3s`, `--progress-file F`, `--cost-usd 0.40`, `--for PURPOSE`, `-q`. |
+| `antsy run [flags] -- <cmd>` | Run under a contract. Flags: `--name`, `--stall 2m`, `--max 2h`, `--mem 8G`, `--need-mem 4G`, `--fail-on RE` (repeatable), `--no-default-fail-on`, `--grace 3s`, `--progress-file F`, `--cost-usd 0.40`, `--for PURPOSE`, `-q`. `--mem auto` caps at 30% over the job name's highest recent peak. |
 | `antsy watch pid <pid> [--mem 8G] [--stall 5m --progress-file F]` | Watch a process you didn't start. |
 | `antsy watch log <file> [--fail-on RE] [--until RE] [--stall 2m]` | Fail on a log line, finish on another. |
 | `antsy watch check --every 30s [--until-ok] [--until RE] [--fail-on RE] -- <probe>` | Cheap polling done by the daemon (CI status, a health URL, a file appearing). |
@@ -105,6 +107,9 @@ config.
 | `antsy events [-f] [--all]` | Recent results and failures; `-f` streams them for the Monitor tool. |
 | `antsy board [--mine]` | Memory, every agent's jobs and watches, today's spend. |
 | `antsy log ID` / `antsy stop ID…` / `antsy stop --mine` | Inspect or stop. |
+| `antsy traces [--job ID] [--errors] [--service S] [--slow MS]` | Read spans back: what a job or service did, where it failed, what was slow. |
+| `antsy history [NAME]` | What past runs of a job measured (outcome, duration, peak). Data for the next contract. |
+| `antsy config` | Effective settings and which file each layer came from. |
 | `antsy spend [USD WHAT]` | Spend ledger with a daily cap (exit 3 over it). |
 | `antsy note ID\|PURPOSE TEXT [--useful\|--waste]` | Record what a run or purpose bought. |
 | `antsy account [--days 7] [--by for\|name\|mode\|session]` | Where compute and money went; failure loops; purposes with no outcome. |
@@ -163,5 +168,6 @@ Defaults live in the binary. Override per user in `~/.antsy/config.json` and per
 nearest `.antsy.json` (top-level keys replace defaults): `stall`, `max`, `fail_on`, `ignore`, `grace`,
 `free_floor_pct`, `mem_killer` (`auto` | `antsy` | `off`), `external_killers`, `sleep_max_s`, `heavy`,
 `paid`, `spend_cap_usd_day`, `otlp_port`, `forward` (an OTLP/HTTP collector to copy traces to),
-`idle_exit`, and `nudge` (`once` | `always` | `off`). A project should commit its `.antsy.json` with
+`idle_exit`, `nudge` (`once` | `always` | `off`), and `on_session_end` (`stop` | `keep`). `antsy config`
+prints the result. A project should commit its `.antsy.json` with
 its own failure lines and heavy commands.

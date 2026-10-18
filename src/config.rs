@@ -49,7 +49,11 @@ pub fn defaults() -> Value {
         "otlp_port": 4318,
         "idle_exit": "60m",
         // "once" per session per kind, "always", or "off".
-        "nudge": "once"
+        "nudge": "once",
+        // When a session ends, its watches and detached jobs are stopped ("stop") or left ("keep").
+        "on_session_end": "stop",
+        // An OTLP/HTTP collector to copy every batch to, e.g. "http://localhost:4319". Empty = keep local.
+        "forward": ""
     })
 }
 
@@ -101,4 +105,27 @@ pub fn get_str(c: &Value, k: &str) -> String {
 
 pub fn get_f(c: &Value, k: &str) -> f64 {
     c.get(k).and_then(Value::as_f64).unwrap_or(0.0)
+}
+
+/// `antsy config`: the effective settings and where each layer came from.
+pub fn main(_args: &[String]) -> i32 {
+    let mut layers = vec!["built-in defaults".to_string()];
+    let user = home().join("config.json");
+    if user.exists() {
+        layers.push(user.display().to_string());
+    }
+    if let Ok(mut d) = std::env::current_dir() {
+        loop {
+            if d.join(".antsy.json").exists() {
+                layers.push(d.join(".antsy.json").display().to_string());
+                break;
+            }
+            if !d.pop() {
+                break;
+            }
+        }
+    }
+    println!("layers (later wins per key): {}", layers.join(" < "));
+    println!("{}", serde_json::to_string_pretty(&load()).unwrap_or_default());
+    0
 }

@@ -160,11 +160,16 @@ pub fn tick(w: &mut Value) -> Option<(&'static str, String, String)> {
             w["last_run"] = json!(now());
             let (code, out) = run_check(&target, s(w, "cwd"), Duration::from_secs_f64(f(w, "every").clamp(5.0, 60.0)));
             let last = out.lines().last().unwrap_or("").chars().take(300).collect::<String>();
-            if config::regexes(&strs(w, "fail_on")).iter().any(|r| r.is_match(&out)) {
-                return Some(("fail", "fail_on".into(), format!("{name}: {last}")));
+            // Patterns match per line, so `^success$` works on a probe that prints "success\n".
+            let hit = |key: &str| {
+                let res = config::regexes(&strs(w, key));
+                out.lines().find(|l| res.iter().any(|r| r.is_match(l))).map(str::to_string)
+            };
+            if let Some(l) = hit("fail_on") {
+                return Some(("fail", "fail_on".into(), format!("{name}: {l}")));
             }
-            if config::regexes(&strs(w, "until")).iter().any(|r| r.is_match(&out)) {
-                return Some(("done", "until".into(), format!("{name}: {last}")));
+            if let Some(l) = hit("until") {
+                return Some(("done", "until".into(), format!("{name}: {l}")));
             }
             let until_ok = w["until_ok"].as_bool().unwrap_or(false);
             match (code, until_ok) {

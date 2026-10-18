@@ -7,15 +7,17 @@ mod hook;
 mod init;
 mod mem;
 mod otel;
+mod pb;
 mod run;
 mod spend;
+mod traces;
 mod util;
 mod watch;
 
 const HELP: &str = "antsy — fail fast, never wait on a clock.
 
   antsy run [--name N] [--stall 2m] [--max 2h] [--mem 8G] [--need-mem 4G] [--fail-on RE]...
-            [--no-default-fail-on] [--grace 3s] [--progress-file F] [--cost-usd 0.40] [--for PURPOSE] [-q] -- <cmd>
+            [--no-default-fail-on] [--grace 3s] [--mem auto] [--progress-file F] [--cost-usd 0.40] [--for PURPOSE] [-q] -- <cmd>
       Run under a failure-mode contract. Exit codes: child's own, 121 stall, 122 mem, 123 fail_on,
       124 max, 125 refused at admission, 126 stopped, 128+N signal.
   antsy watch pid|log|check …   failure modes for things antsy didn't start (evaluated by the daemon)
@@ -28,6 +30,10 @@ const HELP: &str = "antsy — fail fast, never wait on a clock.
   antsy note ID|PURPOSE TEXT [--useful|--waste]   record what a run or purpose bought
   antsy account [--days 7] [--by for|name|mode|session] [--json]
                                  where compute and money went, failure loops, purposes with no outcome
+  antsy traces [--job ID] [--errors] [--service S] [--slow MS] [--days 1] [-n 30] [--json]
+                                 spans the daemon received and jobs recorded
+  antsy history [NAME] [-n 15]   past runs: outcome, duration, peak memory (what `--mem auto` learns from)
+  antsy config                   effective settings and their sources
   antsy mem                      one line of machine memory
   antsy init [--write]           scan this project (kinds, running processes, OTel, paid SDKs, CI) and draft .antsy.json
   antsy creed                    the operating rules the plugin gives every session
@@ -81,6 +87,9 @@ fn main() {
         "init" => init::main(rest),
         "note" => account::note(rest),
         "account" => account::main(rest),
+        "history" => account::history(rest),
+        "traces" => traces::main(rest),
+        "config" => config::main(rest),
         "daemon" => daemon::main(rest),
         "hook" => hook::main(rest),
         "version" | "--version" | "-V" => {

@@ -61,6 +61,7 @@ pub fn parse(args: &[String]) -> Result<Opts, String> {
         purpose: std::env::var("ANTSY_FOR").unwrap_or_default(),
         cmd: vec![],
     };
+    let mut mem_auto = false;
     let mut it = args.iter();
     while let Some(a) = it.next() {
         let mut val = || it.next().cloned().ok_or(format!("{a} needs a value"));
@@ -72,7 +73,11 @@ pub fn parse(args: &[String]) -> Result<Opts, String> {
             "--name" | "-n" => o.name = val()?,
             "--stall" => o.stall = parse_dur(&val()?),
             "--max" => o.max = parse_dur(&val()?),
-            "--mem" => o.mem_mb = parse_mem(&val()?),
+            "--mem" => {
+                let v = val()?;
+                mem_auto = v == "auto";
+                o.mem_mb = if mem_auto { 0 } else { parse_mem(&v) };
+            }
             "--need-mem" => o.need_mb = parse_mem(&val()?),
             "--fail-on" => o.fail_on.push(val()?),
             "--no-default-fail-on" => o.defaults = false,
@@ -96,11 +101,17 @@ pub fn parse(args: &[String]) -> Result<Opts, String> {
         d.append(&mut o.fail_on);
         o.fail_on = d;
     }
-    if o.need_mb == 0 {
-        o.need_mb = o.mem_mb;
-    }
     if o.name.is_empty() {
         o.name = o.cmd.join(" ").chars().take(40).collect();
+    }
+    // `--mem auto`: cap from what this job name measured before; with no history, no cap yet.
+    if mem_auto {
+        if let Some(peak) = crate::account::peaks(&o.name, 5).into_iter().max() {
+            o.mem_mb = crate::account::auto_cap(peak);
+        }
+    }
+    if o.need_mb == 0 {
+        o.need_mb = o.mem_mb;
     }
     Ok(o)
 }
@@ -182,10 +193,12 @@ pub fn main(args: &[String]) -> i32 {
         attrs = format!("{prev},{attrs}");
     }
     cmd.env("OTEL_RESOURCE_ATTRIBUTES", attrs);
+    // The daemon reads OTLP/HTTP as JSON or protobuf, plain or gzip, so SDK defaults just work.
     if std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").is_err() {
         cmd.env("OTEL_EXPORTER_OTLP_ENDPOINT", format!("http://127.0.0.1:{}", get_str(&c, "otlp_port")));
-        cmd.env("OTEL_EXPORTER_OTLP_PROTOCOL", "http/json");
-        cmd.env("OTEL_EXPORTER_OTLP_COMPRESSION", "none");
+        if std::env::var("OTEL_EXPORTER_OTLP_PROTOCOL").is_err() {
+            cmd.env("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf");
+        }
     }
     // Rust builds: fewer parallel rustc jobs when memory is short, instead of swapping.
     if cmdline.contains("cargo ") && std::env::var("CARGO_BUILD_JOBS").is_err() {
@@ -221,7 +234,8 @@ pub fn main(args: &[String]) -> i32 {
     write_json(&job_path, &job);
     emit("start", &sess, &id, "", &o.name);
     if !o.quiet {
-        eprintln!("antsy: {id} started (stall {}, log {})", fmt_ago(o.stall), log_path.display());
+        let cap = if o.mem_mb > 0 { format!(", mem cap {}", fmt_mb(o.mem_mb)) } else { String::new() };
+        eprintln!("antsy: {id} started (stall {}{cap}, log {})", fmt_ago(o.stall), log_path.display());
     }
 
     let (tx, rx) = mpsc::channel::<(bool, String)>();
