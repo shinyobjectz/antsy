@@ -38,6 +38,15 @@ claude plugin install antsy@antsy
 sh ~/.claude/plugins/marketplaces/antsy/scripts/install.sh   # binary: release download, else cargo build
 ```
 
+Skill only (any agent the [skills CLI](https://skills.sh) supports), plus the binary:
+
+```sh
+npx skills add shinyobjectz/antsy
+curl -fsSL https://raw.githubusercontent.com/shinyobjectz/antsy/main/scripts/install.sh | sh
+```
+
+The skill alone carries the rules; the Claude Code plugin adds the hooks and the failure monitor.
+
 Release binaries for macOS (arm64, x86_64) and Linux (x86_64, arm64, static musl) are on the
 [releases page](https://github.com/shinyobjectz/antsy/releases); the install script picks the right one.
 

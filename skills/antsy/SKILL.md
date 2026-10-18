@@ -3,11 +3,14 @@ name: antsy
 description: >-
   The fail-fast operating philosophy: define how work fails before starting it, never wait on a
   clock or estimate durations, leave nothing hanging, trace everything with OpenTelemetry, test
-  cheapest-first, and treat machine memory as shared. Use it whenever you start anything that
-  runs longer than a moment (builds, test suites, servers, renders, training, local models,
-  deploys, CI), whenever you are tempted to sleep, poll, or say "this should take about N
-  minutes", before any paid API or GPU call, before heavy local work on a shared machine, when
-  adding logging or telemetry to code, and when deciding how to wait for something.
+  cheapest-first, treat machine memory as shared, and attribute compute and spend to a purpose.
+  Use it whenever you start anything that runs longer than a moment (builds, test suites,
+  servers, renders, training, local models, deploys, CI), whenever you are tempted to sleep,
+  poll, or say "this should take about N minutes", before any paid API or GPU call, before heavy
+  local work on a shared machine, when adding logging or telemetry to code, when deciding how to
+  wait for something, when first doing long-running work in a project with no .antsy.json, and
+  when judging whether compute, money, or a data set is being used well (ML, evals, tests,
+  automations).
 ---
 
 # Antsy
@@ -15,6 +18,12 @@ description: >-
 Antsy is impatient with failure, not with work. The goal is to learn that something has failed
 at the first moment it is knowable, at the lowest cost, without a human or a model sitting and
 watching. Waiting is an event, not a duration.
+
+If `antsy` isn't on PATH (`antsy version` fails), the skill was installed without its plugin.
+Install the binary with `curl -fsSL https://raw.githubusercontent.com/shinyobjectz/antsy/main/scripts/install.sh | sh`
+(or `cargo install --git https://github.com/shinyobjectz/antsy --locked`), and for the hooks and
+monitor, the Claude Code plugin: `claude plugin marketplace add shinyobjectz/antsy` then
+`claude plugin install antsy@antsy`. The rules below still apply without it.
 
 The plugin gives you a binary, `antsy`, and hooks that run on every session. The hooks are cheap
 state-file reads; they speak only when something failed or a rule is about to be broken.
